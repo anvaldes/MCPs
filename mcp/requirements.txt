@@ -1,0 +1,10 @@
+mcp==1.26.0
+fastmcp==2.13.1
+httpx==0.28.1
+google-auth==2.49.0
+google-cloud-secret-manager==2.22.0
+google-cloud-storage==2.16.0
+requests==2.32.5
+starlette==0.46.2
+google-cloud-firestore==2.26.0
+python-multipart==0.0.22

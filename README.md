@@ -1,1 +1,1 @@
-# MCPs
+# proyecto-test-mcp

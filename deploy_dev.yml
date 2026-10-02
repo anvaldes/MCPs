@@ -1,0 +1,80 @@
+name: Deploy api services proyecto-test-mcp [DEV]
+
+on:
+  push:
+    branches: [dev]
+
+concurrency:
+  group: api-server-cl-dev-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build & Push image + Deploy Cloud Run (all services)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    env:
+      SERVICE_NAME: proyecto-test-mcp
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: "${{ secrets.GCP_SA_KEY }}"
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker auth for Artifact Registry
+        run: |
+          gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # --------------------------------------------------
+      # BUILD & PUSH (MCP Image)
+      # --------------------------------------------------
+      - name: Build & Push MCP image
+        run: |
+          set -euo pipefail
+          PROJECT_ID="dm-agents"
+          AR_HOST="us-central1-docker.pkg.dev"
+          IMAGE_URI="${AR_HOST}/${PROJECT_ID}/${SERVICE_NAME}/mcp-${SERVICE_NAME}-dev:${{ github.sha }}"
+          docker buildx build \
+            --platform linux/amd64 \
+            -f mcp/Dockerfile \
+            mcp/ \
+            -t "${IMAGE_URI}" \
+            -t "${AR_HOST}/${PROJECT_ID}/${SERVICE_NAME}/mcp-${SERVICE_NAME}-dev:latest" \
+            --push
+
+      # --------------------------------------------------
+      # DEPLOY (MCP Service)
+      # --------------------------------------------------
+      - name: Deploy MCP Cloud Run
+        run: |
+          set -euo pipefail
+          PROJECT_ID="dm-agents"
+          AR_HOST="us-central1-docker.pkg.dev"
+          IMAGE_URI="${AR_HOST}/${PROJECT_ID}/${SERVICE_NAME}/mcp-${SERVICE_NAME}-dev:${{ github.sha }}"
+          REGION="us-central1"
+          SERVICE_CLOUD_RUN="mcp-${SERVICE_NAME}-dev"
+          CLOUD_RUN_SA="${SERVICE_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+          ENV_VARS="BASE_URL=https://${SERVICE_CLOUD_RUN}-670644365720.us-central1.run.app,GOOGLE_WEB_CLIENT_ID=${{ secrets.GOOGLE_WEB_CLIENT_ID }},GOOGLE_WEB_CLIENT_SECRET=${{ secrets.GOOGLE_WEB_CLIENT_SECRET }}"
+          gcloud run deploy "${SERVICE_CLOUD_RUN}" \
+            --image="${IMAGE_URI}" \
+            --platform=managed \
+            --region="${REGION}" \
+            --project="${PROJECT_ID}" \
+            --service-account="${CLOUD_RUN_SA}" \
+            --memory=1Gi \
+            --timeout=900 \
+            --ingress=all \
+            --allow-unauthenticated \
+            --set-env-vars="${ENV_VARS}"
