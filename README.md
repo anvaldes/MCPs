@@ -1,4 +1,4 @@
-# proyecto-test-mcp
+# MCPs
 
 A small, remote **MCP server** written in Python. It exposes two demo tools, protects them with **Google sign-in**, only lets in users on an **allowlist**, and records every tool call in **Google Cloud Storage**. It is packaged with Docker and meant to run on **Cloud Run**.
 
